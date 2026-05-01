@@ -1,0 +1,687 @@
+
+#pragma once
+
+#include "./DxAniKeys.h"
+#include "./CharacterSound.h"
+#include "./DxPieceDefine.h"
+#include "./DxBoneCollector.h"
+#include "./DxAniBoneScale.h"
+#include "../DxEffect/EffAni/DxEffAni.h"
+
+enum EMANICONINFO
+{
+	ACF_NEWINFO		= 0x0001,
+	ACF_LOOP		= 0x0010,
+	ACF_UPBODY		= 0x0100,	// UPBODY ¼ÂÆÃ.		// UP DOWN ÀÌ ¼ÂÆÃ ¾ÈµÉ °æ¿ì´Â µðÆúÆ®·Î ÀüÃ¼´Ù.
+	ACF_DOWNBODY	= 0x0200,	// UPÀÌ ¾ø°í DOWN¸¸ ¼ÂÆÃ µÉ °æ¿ì UPÀº DOWN¿¡ ¿µÇâÀ» ¹Þ¾Æ¾ß ÇÑ´Ù.
+	ACF_SZNAME		= 128,
+	ACF_DIV			= 8,
+	ACF_STRIKE		= 9,
+};
+
+// Added by janzs420 | add new version for animation bin
+struct SAnimation
+{
+	//enum { VERSION = 0x0102, };
+	enum { VERSION = 0x0103, };
+
+	// animation information
+	SPositionKey	*m_pPositionKeys;	//	ÀÌµ¿ ¿¡´ÏÅ°.
+	UINT			m_cPositionKeys;
+	
+	SRotateKey		*m_pRotateKeys;		//	È¸Àü ¿¡´ÏÅ°.
+	UINT			m_cRotateKeys;
+	
+	SScaleKey		*m_pScaleKeys;		//	Å©±â ¿¡´ÏÅ°.
+	UINT			m_cScaleKeys;
+	
+	SMatrixKey		*m_pMatrixKeys;		// Matrix
+	UINT			m_cMatrixKeys;
+
+	SQuatPosKey*	m_pQuatPosKeys;		// Quaternion Å×½ºÆ® ÇÒ °ÍÀÌ´Ù..  ¿Ï¼ºµÇ¸é Matrix´Â »ç¿ë ¾È ÇÒ °ÍÀÓ.
+	UINT			m_cQuatPosKeys;
+	D3DXQUATERNION*	m_pQuatOrigRot;		// ¼ø¼öÇÑ È¸Àü.. ¾ÆÁÖ ¿øÁ¶ÀÌ´Ù. MIX ½Ã¸¸ »ç¿ëÇÑ´Ù. ~!!
+
+	TSTRING		m_strBone;
+	DxBoneTrans		*pBoneToAnimate;	//	Àû¿ëµÉ BONE °ú ¿¬°á.
+
+	DWORD			m_dwCurKey;
+	float			m_fDivFullTime;		// Opitimize - ¿ø·¡´Â ÀÌ °ª 1.f/m_pMatrixKeys[m_cMatrixKeys-1].fTime
+	float			m_fMatrixKeys;		// Opitimize - ¿ø·¡´Â ÀÌ °ª m_cMatrixKeys
+
+	SAnimation() :
+			m_pPositionKeys(NULL),
+			m_cPositionKeys(0),
+			m_pScaleKeys(NULL),
+			m_cScaleKeys(0),
+			m_pRotateKeys(NULL),
+			m_cRotateKeys(0),
+			m_pMatrixKeys(NULL),
+			m_cMatrixKeys(0),
+			m_pQuatPosKeys(NULL),
+			m_cQuatPosKeys(0),
+			m_pQuatOrigRot(NULL),
+
+			pBoneToAnimate(NULL),
+			m_dwCurKey(0),
+			m_fDivFullTime(0.f),
+			m_fMatrixKeys(0.f)
+	{
+	}
+
+	~SAnimation()
+	{
+		SAFE_DELETE_ARRAY(m_pPositionKeys);
+		SAFE_DELETE_ARRAY(m_pRotateKeys);
+		SAFE_DELETE_ARRAY(m_pScaleKeys);
+		SAFE_DELETE_ARRAY(m_pMatrixKeys);
+		SAFE_DELETE_ARRAY(m_pQuatPosKeys);
+		SAFE_DELETE_ARRAY(m_pQuatOrigRot);
+
+		// do NOT delete pToAnimate
+	}
+
+	void SetTime ( float fTime, float fWeight, BOOL bFirst );
+	void SetMix ( float fTime );
+
+	UINT GetThisKey ( float fTime ) const;
+	const SMatrixKey* GetMapThisKey ( float fGlobalTime ) const;
+
+	void SetMatrix ( UINT iKey );
+	void SetMatrix ( const SMatrixKey* pMatrixKey )	{ pBoneToAnimate->matRot = pMatrixKey->mat; }
+
+	void ConvertMatToQuat();
+
+	HRESULT SaveToFile ( CSerialFile &SFile );
+	HRESULT LoadFromFile ( CSerialFile &SFile, const DxSkeleton* pSkeleton );
+	HRESULT Load_0100( CSerialFile &SFile, const DxSkeleton* pSkeleton );
+	HRESULT Load_0101( CSerialFile &SFile, const DxSkeleton* pSkeleton );
+	//Added by XMEN2 | 11-8-2012 | add new version for animation bin
+	HRESULT Load_0102( CSerialFile &SFile, const DxSkeleton* pSkeleton );
+	HRESULT Load( CSerialFile &SFile, const DxSkeleton* pSkeleton );
+};
+
+struct SANIMCONINFO_101
+{
+	TCHAR			m_szName[ACF_SZNAME];		//	ÀÌ¸§.
+	TCHAR			m_szSkeletion[ACF_SZNAME];	//	»À´Ù±Í ÀÌ¸§.
+
+	DWORD			m_dwFlag;					//	±âÅ¸ ¼Ó¼º.
+	DWORD			m_dwSTime;					//	½ÃÀÛ ½Ã°£.
+	DWORD			m_dwETime, m_dwETimeOrig;	//	³¡ ½Ã°£.
+	DWORD			m_UNITTIME;					//	Å°´ÜÀ§ ½Ã°£.
+
+	EMANI_MAINTYPE	m_MainType;
+	EMANI_SUBTYPE	m_SubType;
+
+	WORD			m_wDivCount;				//	¿¡´Ï¸ÞÀÌ¼Ç ºÐÇÒ Å° °¹¼ö.
+	WORD			m_wDivFrame[ACF_DIV];		//	¿¡´Ï¸ÞÀÌ¼Ç ºÐÇÒ Å°µé..
+
+	SANIMCONINFO_101()
+	{
+		memset( m_szName, 0, sizeof(TCHAR)*ACF_SZNAME );
+		memset( m_szSkeletion, 0, sizeof(TCHAR)*ACF_SZNAME );
+	}
+};
+
+struct SANIMCONINFO_102
+{
+	TCHAR			m_szName[ACF_SZNAME];		//	ÀÌ¸§.
+	TCHAR			m_szSkeletion[ACF_SZNAME];	//	»À´Ù±Í ÀÌ¸§.
+
+	DWORD			m_dwFlag;					//	±âÅ¸ ¼Ó¼º.
+	DWORD			m_dwSTime;					//	½ÃÀÛ ½Ã°£.
+	DWORD			m_dwETime, m_dwETimeOrig;	//	³¡ ½Ã°£.
+	DWORD			m_UNITTIME;					//	Å°´ÜÀ§ ½Ã°£.
+
+	EMANI_MAINTYPE	m_MainType;
+	EMANI_SUBTYPE	m_SubType;
+
+	WORD			m_wDivCount;				//	¿¡´Ï¸ÞÀÌ¼Ç ºÐÇÒ Å° °¹¼ö.
+	WORD			m_wDivFrame[ACF_DIV];		//	¿¡´Ï¸ÞÀÌ¼Ç ºÐÇÒ Å°µé..
+
+	SChaSoundData_102	m_ChaSoundData;				//	»ç¿îµå µ¥ÀÌÅ¸
+
+	SANIMCONINFO_102()
+	{
+		memset( m_szName, 0, sizeof(TCHAR)*ACF_SZNAME );
+		memset( m_szSkeletion, 0, sizeof(TCHAR)*ACF_SZNAME );
+	}
+};
+
+struct SANIMCONINFO_103
+{
+	TCHAR			m_szName[ACF_SZNAME];
+	TCHAR			m_szSkeletion[ACF_SZNAME];
+
+	DWORD			m_dwFlag;
+	DWORD			m_dwSTime;
+	DWORD			m_dwETime, m_dwETimeOrig;
+	DWORD			m_UNITTIME;
+
+	EMANI_MAINTYPE	m_MainType;
+	EMANI_SUBTYPE	m_SubType;
+
+	WORD			m_wDivCount;
+	WORD			m_wDivFrame[ACF_DIV];
+
+	SChaSoundData_103	m_ChaSoundData;
+
+	SANIMCONINFO_103()
+	{
+		memset( m_szName, 0, sizeof(TCHAR)*ACF_SZNAME );
+		memset( m_szSkeletion, 0, sizeof(TCHAR)*ACF_SZNAME );
+	}
+};
+
+enum EMSTRIKE_EFF
+{
+	EMSF_NULL		= 0,
+	EMSF_SELFBODY	= 1,
+	EMSF_TARGET		= 2,
+
+	EMSF_SIZE		= 3
+};
+
+struct SANIMSTRIKE
+{
+	EMPIECECHAR		m_emPiece;
+	EMSTRIKE_EFF	m_emEffect;
+	DWORD			m_dwFrame;
+
+	SANIMSTRIKE () :
+	m_emPiece(PIECE_RHAND),
+		m_emEffect(EMSF_TARGET),
+		m_dwFrame(0)
+	{
+	}
+};
+
+struct SANIMCONINFO_104
+{
+	TCHAR			m_szName[ACF_SZNAME];		//	ÀÌ¸§.
+	TCHAR			m_szSkeletion[ACF_SZNAME];	//	»À´Ù±Í ÀÌ¸§.
+
+	DWORD			m_dwFlag;					//	±âÅ¸ ¼Ó¼º.
+	DWORD			m_dwSTime;					//	½ÃÀÛ ½Ã°£.
+	DWORD			m_dwETime, m_dwETimeOrig;	//	³¡ ½Ã°£.
+	DWORD			m_UNITTIME;					//	Å°´ÜÀ§ ½Ã°£.
+
+	EMANI_MAINTYPE	m_MainType;
+	EMANI_SUBTYPE	m_SubType;
+
+	WORD			m_wDivCount;				//	¿¡´Ï¸ÞÀÌ¼Ç ºÐÇÒ Å° °¹¼ö.
+	WORD			m_wDivFrame[ACF_DIV];		//	¿¡´Ï¸ÞÀÌ¼Ç ºÐÇÒ Å°µé.
+
+	WORD			m_wStrikeCount;
+	SANIMSTRIKE		m_sStrikeEff[ACF_STRIKE];	//	Å¸°Ý ÀÌÆÑÆ® ½ÃÁ¡µé.
+
+	SChaSoundData_103	m_ChaSoundData;				//	»ç¿îµå µ¥ÀÌÅ¸
+
+	SANIMCONINFO_104()
+	{
+		memset( m_szName, 0, sizeof(TCHAR)*ACF_SZNAME );
+		memset( m_szSkeletion, 0, sizeof(TCHAR)*ACF_SZNAME );
+	}
+};
+
+struct SANIMCONINFO_105
+{
+	typedef std::list<DxEffAniData*>				EFFANILIST;			
+	typedef std::list<DxEffAniData*>::iterator		EFFANILIST_ITER;
+
+	TCHAR			m_szName[ACF_SZNAME];		//	ÀÌ¸§.
+	TCHAR			m_szSkeletion[ACF_SZNAME];	//	»À´Ù±Í ÀÌ¸§.
+
+	DWORD			m_dwFlag;					//	±âÅ¸ ¼Ó¼º.
+	DWORD			m_dwSTime;					//	½ÃÀÛ ½Ã°£.
+	DWORD			m_dwETime, m_dwETimeOrig;	//	³¡ ½Ã°£.
+	DWORD			m_UNITTIME;					//	Å°´ÜÀ§ ½Ã°£.
+
+	EMANI_MAINTYPE	m_MainType;
+	EMANI_SUBTYPE	m_SubType;
+
+	WORD			m_wDivCount;				//	¿¡´Ï¸ÞÀÌ¼Ç ºÐÇÒ Å° °¹¼ö.
+	WORD			m_wDivFrame[ACF_DIV];		//	¿¡´Ï¸ÞÀÌ¼Ç ºÐÇÒ Å°µé.
+
+	WORD			m_wStrikeCount;
+	SANIMSTRIKE		m_sStrikeEff[ACF_STRIKE];	//	Å¸°Ý ÀÌÆÑÆ® ½ÃÁ¡µé.
+
+	SChaSoundData_103	m_ChaSoundData;				//	»ç¿îµå µ¥ÀÌÅ¸
+
+	EFFANILIST		m_listEffAni;				// ¸ð¼Ç È¿°ú !
+
+	SANIMCONINFO_105()
+	{
+		memset( m_szName, 0, sizeof(TCHAR)*ACF_SZNAME );
+		memset( m_szSkeletion, 0, sizeof(TCHAR)*ACF_SZNAME );
+	}
+};
+
+struct SANIMCONINFO_106
+{
+	typedef std::list<DxEffAniData*>				EFFANILIST;			
+	typedef std::list<DxEffAniData*>::iterator		EFFANILIST_ITER;
+
+	TCHAR			m_szName[ACF_SZNAME];		//	ÀÌ¸§.
+	TCHAR			m_szSkeletion[ACF_SZNAME];	//	»À´Ù±Í ÀÌ¸§.
+
+	DWORD			m_dwFlag;					//	±âÅ¸ ¼Ó¼º.
+	DWORD			m_dwSTime;					//	½ÃÀÛ ½Ã°£.
+	DWORD			m_dwETime, m_dwETimeOrig;	//	³¡ ½Ã°£.
+	DWORD			m_UNITTIME;					//	Å°´ÜÀ§ ½Ã°£.
+
+	EMANI_MAINTYPE	m_MainType;
+	EMANI_SUBTYPE	m_SubType;
+
+	WORD			m_wDivCount;				//	¿¡´Ï¸ÞÀÌ¼Ç ºÐÇÒ Å° °¹¼ö.
+	WORD			m_wDivFrame[ACF_DIV];		//	¿¡´Ï¸ÞÀÌ¼Ç ºÐÇÒ Å°µé.
+
+	WORD			m_wStrikeCount;
+	SANIMSTRIKE		m_sStrikeEff[ACF_STRIKE];	//	Å¸°Ý ÀÌÆÑÆ® ½ÃÁ¡µé.
+
+	SChaSoundData	m_ChaSoundData;				//	»ç¿îµå µ¥ÀÌÅ¸
+
+	EFFANILIST		m_listEffAni;				// ¸ð¼Ç È¿°ú !
+
+	SANIMCONINFO_106 () :
+		m_dwFlag(ACF_LOOP|ACF_NEWINFO),
+		m_dwSTime(0),
+		m_dwETime(0),
+		m_dwETimeOrig(0),
+		m_UNITTIME(0),
+		m_MainType(AN_GUARD_N),
+		m_SubType(AN_SUB_NONE),
+
+		m_wDivCount(0),
+		m_wStrikeCount(0)
+	{
+		memset( m_szName, 0, sizeof(TCHAR)*ACF_SZNAME );
+		memset( m_szSkeletion, 0, sizeof(TCHAR)*ACF_SZNAME );
+
+		memset ( m_wDivFrame, 0, sizeof(WORD)*ACF_DIV );
+	}
+};
+
+struct SANIMCONINFO	
+{
+	enum 
+	{ 
+		VERSION			= 0x0200,
+		VERSION_ENCODE	= 0x0200, 
+	};
+
+	typedef std::list<DxEffAniData*>				EFFANILIST;			
+	typedef std::list<DxEffAniData*>::iterator		EFFANILIST_ITER;
+
+	TCHAR			m_szName[ACF_SZNAME];		//	ÀÌ¸§.
+	TCHAR			m_szSkeletion[ACF_SZNAME];	//	»À´Ù±Í ÀÌ¸§.
+
+	DWORD			m_dwFlag;					//	±âÅ¸ ¼Ó¼º.
+	DWORD			m_dwSTime;					//	½ÃÀÛ ½Ã°£.
+	DWORD			m_dwETime, m_dwETimeOrig;	//	³¡ ½Ã°£.
+	DWORD			m_UNITTIME;					//	Å°´ÜÀ§ ½Ã°£.
+
+	EMANI_MAINTYPE	m_MainType;
+	EMANI_SUBTYPE	m_SubType;
+
+	WORD			m_wDivCount;				//	¿¡´Ï¸ÞÀÌ¼Ç ºÐÇÒ Å° °¹¼ö.
+	WORD			m_wDivFrame[ACF_DIV];		//	¿¡´Ï¸ÞÀÌ¼Ç ºÐÇÒ Å°µé.
+
+	WORD			m_wStrikeCount;
+	SANIMSTRIKE		m_sStrikeEff[ACF_STRIKE];	//	Å¸°Ý ÀÌÆÑÆ® ½ÃÁ¡µé.
+
+	SChaSoundData	m_ChaSoundData;				//	»ç¿îµå µ¥ÀÌÅ¸
+
+	EFFANILIST		m_listEffAni;				// ¸ð¼Ç È¿°ú !
+	DxAniScale*		m_pAniScale;				// ¾Ö´Ï¸ÞÀÌ¼Ç ½ºÄÉÀÏ.~!
+
+	SANIMCONINFO();
+	~SANIMCONINFO();
+	void CleanUp();
+
+	BOOL LoadFile ( const TCHAR *szFileName, LPDIRECT3DDEVICEQ pd3dDevice=NULL );
+	void LoadFile_0101 ( basestream &SFile, LPDIRECT3DDEVICEQ pd3dDevice );
+	void LoadFile_0102 ( basestream &SFile, LPDIRECT3DDEVICEQ pd3dDevice );
+	void LoadFile_0103 ( basestream &SFile, LPDIRECT3DDEVICEQ pd3dDevice );
+	void LoadFile_0104 ( basestream &SFile, LPDIRECT3DDEVICEQ pd3dDevice );
+	void LoadFile_0105 ( basestream &SFile, LPDIRECT3DDEVICEQ pd3dDevice );
+	void LoadFile_0106 ( basestream &SFile, LPDIRECT3DDEVICEQ pd3dDevice );
+	void LoadFile_0107 ( basestream &SFile, LPDIRECT3DDEVICEQ pd3dDevice );
+	
+	//official version partial read only
+	void LoadFile_0108_0109_0110 ( basestream &SFile, LPDIRECT3DDEVICEQ pd3dDevice );
+	void LoadFile_0111_0112_0114_0115 ( basestream &SFile, LPDIRECT3DDEVICEQ pd3dDevice );
+	
+	void LoadFile_0200 ( basestream &SFile, LPDIRECT3DDEVICEQ pd3dDevice );
+
+	BOOL SaveFile ( const TCHAR *szFileName );
+
+	SANIMCONINFO& operator = ( SANIMCONINFO &value );
+};
+// Added by janzs420  | add new version for animation cfg
+struct SANIMCONINFO_107			// 107
+{
+	//enum { VERSION = 0x0108 };
+
+	typedef std::list<DxEffAniData*>				EFFANILIST;			
+	typedef std::list<DxEffAniData*>::iterator		EFFANILIST_ITER;
+
+	TCHAR			m_szName[ACF_SZNAME];		//	ÀÌ¸§.
+	TCHAR			m_szSkeletion[ACF_SZNAME];	//	»À´Ù±Í ÀÌ¸§.
+
+	DWORD			m_dwFlag;					//	±âÅ¸ ¼Ó¼º.
+	DWORD			m_dwSTime;					//	½ÃÀÛ ½Ã°£.
+	DWORD			m_dwETime, m_dwETimeOrig;	//	³¡ ½Ã°£.
+	DWORD			m_UNITTIME;					//	Å°´ÜÀ§ ½Ã°£.
+
+	EMANI_MAINTYPE	m_MainType;
+	EMANI_SUBTYPE	m_SubType;
+
+	WORD			m_wDivCount;				//	¿¡´Ï¸ÞÀÌ¼Ç ºÐÇÒ Å° °¹¼ö.
+	WORD			m_wDivFrame[ACF_DIV];		//	¿¡´Ï¸ÞÀÌ¼Ç ºÐÇÒ Å°µé.
+
+	WORD			m_wStrikeCount;
+	SANIMSTRIKE		m_sStrikeEff[ACF_STRIKE];	//	Å¸°Ý ÀÌÆÑÆ® ½ÃÁ¡µé.
+
+	SChaSoundData	m_ChaSoundData;				//	»ç¿îµå µ¥ÀÌÅ¸
+
+	EFFANILIST		m_listEffAni;				// ¸ð¼Ç È¿°ú !
+	DxAniScale*		m_pAniScale;				// ¾Ö´Ï¸ÞÀÌ¼Ç ½ºÄÉÀÏ.~!
+
+	SANIMCONINFO_107 () :
+		m_dwFlag(ACF_LOOP|ACF_NEWINFO),
+		m_dwSTime(0),
+		m_dwETime(0),
+		m_dwETimeOrig(0),
+		m_UNITTIME(0),
+		m_MainType(AN_GUARD_N),
+		m_SubType(AN_SUB_NONE),
+
+		m_wDivCount(0),
+		m_wStrikeCount(0),
+		m_pAniScale(NULL)
+	{
+		memset( m_szName, 0, sizeof(TCHAR)*ACF_SZNAME );
+		memset( m_szSkeletion, 0, sizeof(TCHAR)*ACF_SZNAME );
+
+		memset ( m_wDivFrame, 0, sizeof(WORD)*ACF_DIV );
+
+		m_pAniScale = new DxAniScale;
+	}
+};
+
+struct SANIMCONINFO_108			// 107
+{
+	//enum { VERSION = 0x0108 };
+
+	typedef std::list<DxEffAniData*>				EFFANILIST;			
+	typedef std::list<DxEffAniData*>::iterator		EFFANILIST_ITER;
+
+	TCHAR			m_szName[ACF_SZNAME];		//	ÀÌ¸§.
+	TCHAR			m_szSkeletion[ACF_SZNAME];	//	»À´Ù±Í ÀÌ¸§.
+
+	DWORD			m_dwFlag;					//	±âÅ¸ ¼Ó¼º.
+	DWORD			m_dwSTime;					//	½ÃÀÛ ½Ã°£.
+	DWORD			m_dwETime, m_dwETimeOrig;	//	³¡ ½Ã°£.
+	DWORD			m_UNITTIME;					//	Å°´ÜÀ§ ½Ã°£.
+
+	EMANI_MAINTYPE	m_MainType;
+	EMANI_SUBTYPE	m_SubType;
+
+	WORD			m_wDivCount;				//	¿¡´Ï¸ÞÀÌ¼Ç ºÐÇÒ Å° °¹¼ö.
+	WORD			m_wDivFrame[ACF_DIV];		//	¿¡´Ï¸ÞÀÌ¼Ç ºÐÇÒ Å°µé.
+
+	WORD			m_wStrikeCount;
+	SANIMSTRIKE		m_sStrikeEff[ACF_STRIKE];	//	Å¸°Ý ÀÌÆÑÆ® ½ÃÁ¡µé.
+
+	SChaSoundData	m_ChaSoundData;				//	»ç¿îµå µ¥ÀÌÅ¸
+
+	EFFANILIST		m_listEffAni;				// ¸ð¼Ç È¿°ú !
+	DxAniScale*		m_pAniScale;				// ¾Ö´Ï¸ÞÀÌ¼Ç ½ºÄÉÀÏ.~!
+
+	SANIMCONINFO_108 () :
+		m_dwFlag(ACF_LOOP|ACF_NEWINFO),
+		m_dwSTime(0),
+		m_dwETime(0),
+		m_dwETimeOrig(0),
+		m_UNITTIME(0),
+		m_MainType(AN_GUARD_N),
+		m_SubType(AN_SUB_NONE),
+
+		m_wDivCount(0),
+		m_wStrikeCount(0),
+		m_pAniScale(NULL)
+	{
+		memset( m_szName, 0, sizeof(TCHAR)*ACF_SZNAME );
+		memset( m_szSkeletion, 0, sizeof(TCHAR)*ACF_SZNAME );
+
+		memset ( m_wDivFrame, 0, sizeof(WORD)*ACF_DIV );
+
+		m_pAniScale = new DxAniScale;
+	}
+};
+
+struct SANIMCONINFO_109			// 107
+{
+	//enum { VERSION = 0x0108 };
+
+	typedef std::list<DxEffAniData*>				EFFANILIST;			
+	typedef std::list<DxEffAniData*>::iterator		EFFANILIST_ITER;
+
+	TCHAR			m_szName[ACF_SZNAME];		//	ÀÌ¸§.
+	TCHAR			m_szSkeletion[ACF_SZNAME];	//	»À´Ù±Í ÀÌ¸§.
+
+	DWORD			m_dwFlag;					//	±âÅ¸ ¼Ó¼º.
+	DWORD			m_dwSTime;					//	½ÃÀÛ ½Ã°£.
+	DWORD			m_dwETime, m_dwETimeOrig;	//	³¡ ½Ã°£.
+	DWORD			m_UNITTIME;					//	Å°´ÜÀ§ ½Ã°£.
+
+	EMANI_MAINTYPE	m_MainType;
+	EMANI_SUBTYPE	m_SubType;
+
+	WORD			m_wDivCount;				//	¿¡´Ï¸ÞÀÌ¼Ç ºÐÇÒ Å° °¹¼ö.
+	WORD			m_wDivFrame[ACF_DIV];		//	¿¡´Ï¸ÞÀÌ¼Ç ºÐÇÒ Å°µé.
+
+	WORD			m_wStrikeCount;
+	SANIMSTRIKE		m_sStrikeEff[ACF_STRIKE];	//	Å¸°Ý ÀÌÆÑÆ® ½ÃÁ¡µé.
+
+	SChaSoundData	m_ChaSoundData;				//	»ç¿îµå µ¥ÀÌÅ¸
+
+	EFFANILIST		m_listEffAni;				// ¸ð¼Ç È¿°ú !
+	DxAniScale*		m_pAniScale;				// ¾Ö´Ï¸ÞÀÌ¼Ç ½ºÄÉÀÏ.~!
+
+	SANIMCONINFO_109 () :
+		m_dwFlag(ACF_LOOP|ACF_NEWINFO),
+		m_dwSTime(0),
+		m_dwETime(0),
+		m_dwETimeOrig(0),
+		m_UNITTIME(0),
+		m_MainType(AN_GUARD_N),
+		m_SubType(AN_SUB_NONE),
+
+		m_wDivCount(0),
+		m_wStrikeCount(0),
+		m_pAniScale(NULL)
+	{
+		memset( m_szName, 0, sizeof(TCHAR)*ACF_SZNAME );
+		memset( m_szSkeletion, 0, sizeof(TCHAR)*ACF_SZNAME );
+
+		memset ( m_wDivFrame, 0, sizeof(WORD)*ACF_DIV );
+
+		m_pAniScale = new DxAniScale;
+	}
+};
+
+struct SANIMCONINFO_110			// 107
+{
+	//enum { VERSION = 0x0108 };
+
+	typedef std::list<DxEffAniData*>				EFFANILIST;			
+	typedef std::list<DxEffAniData*>::iterator		EFFANILIST_ITER;
+
+	TCHAR			m_szName[ACF_SZNAME];		//	ÀÌ¸§.
+	TCHAR			m_szSkeletion[ACF_SZNAME];	//	»À´Ù±Í ÀÌ¸§.
+
+	DWORD			m_dwFlag;					//	±âÅ¸ ¼Ó¼º.
+	DWORD			m_dwSTime;					//	½ÃÀÛ ½Ã°£.
+	DWORD			m_dwETime, m_dwETimeOrig;	//	³¡ ½Ã°£.
+	DWORD			m_UNITTIME;					//	Å°´ÜÀ§ ½Ã°£.
+
+	EMANI_MAINTYPE	m_MainType;
+	EMANI_SUBTYPE	m_SubType;
+
+	WORD			m_wDivCount;				//	¿¡´Ï¸ÞÀÌ¼Ç ºÐÇÒ Å° °¹¼ö.
+	WORD			m_wDivFrame[ACF_DIV];		//	¿¡´Ï¸ÞÀÌ¼Ç ºÐÇÒ Å°µé.
+
+	WORD			m_wStrikeCount;
+	SANIMSTRIKE		m_sStrikeEff[ACF_STRIKE];	//	Å¸°Ý ÀÌÆÑÆ® ½ÃÁ¡µé.
+
+	SChaSoundData	m_ChaSoundData;				//	»ç¿îµå µ¥ÀÌÅ¸
+
+	EFFANILIST		m_listEffAni;				// ¸ð¼Ç È¿°ú !
+	DxAniScale*		m_pAniScale;				// ¾Ö´Ï¸ÞÀÌ¼Ç ½ºÄÉÀÏ.~!
+
+	SANIMCONINFO_110 () :
+		m_dwFlag(ACF_LOOP|ACF_NEWINFO),
+		m_dwSTime(0),
+		m_dwETime(0),
+		m_dwETimeOrig(0),
+		m_UNITTIME(0),
+		m_MainType(AN_GUARD_N),
+		m_SubType(AN_SUB_NONE),
+
+		m_wDivCount(0),
+		m_wStrikeCount(0),
+		m_pAniScale(NULL)
+	{
+		memset( m_szName, 0, sizeof(TCHAR)*ACF_SZNAME );
+		memset( m_szSkeletion, 0, sizeof(TCHAR)*ACF_SZNAME );
+
+		memset ( m_wDivFrame, 0, sizeof(WORD)*ACF_DIV );
+
+		m_pAniScale = new DxAniScale;
+	}
+};
+
+// Added by janzs420  | update cfg version support
+struct SANIMCONINFO				// 107
+{
+	enum { VERSION = 0x0115 };
+
+	typedef std::list<DxEffAniData*>				EFFANILIST;			
+	typedef std::list<DxEffAniData*>::iterator		EFFANILIST_ITER;
+
+	TCHAR			m_szName[ACF_SZNAME];		//	ÀÌ¸§.
+	TCHAR			m_szSkeletion[ACF_SZNAME];	//	»À´Ù±Í ÀÌ¸§.
+
+	DWORD			m_dwFlag;					//	±âÅ¸ ¼Ó¼º.
+	DWORD			m_dwSTime;					//	½ÃÀÛ ½Ã°£.
+	DWORD			m_dwETime, m_dwETimeOrig;	//	³¡ ½Ã°£.
+	DWORD			m_UNITTIME;					//	Å°´ÜÀ§ ½Ã°£.
+
+	EMANI_MAINTYPE	m_MainType;
+	EMANI_SUBTYPE	m_SubType;
+
+	WORD			m_wDivCount;				//	¿¡´Ï¸ÞÀÌ¼Ç ºÐÇÒ Å° °¹¼ö.
+	WORD			m_wDivFrame[ACF_DIV];		//	¿¡´Ï¸ÞÀÌ¼Ç ºÐÇÒ Å°µé.
+
+	WORD			m_wStrikeCount;
+	SANIMSTRIKE		m_sStrikeEff[ACF_STRIKE];	//	Å¸°Ý ÀÌÆÑÆ® ½ÃÁ¡µé.
+
+	SChaSoundData	m_ChaSoundData;				//	»ç¿îµå µ¥ÀÌÅ¸
+
+	EFFANILIST		m_listEffAni;				// ¸ð¼Ç È¿°ú !
+	DxAniScale*		m_pAniScale;				// ¾Ö´Ï¸ÞÀÌ¼Ç ½ºÄÉÀÏ.~!
+
+	char*			m_szFileName;
+	char*			m_szBinFileName;
+
+	SANIMCONINFO();
+	~SANIMCONINFO();
+	void CleanUp();
+
+	BOOL LoadFile ( const TCHAR *szFileName, LPDIRECT3DDEVICEQ pd3dDevice=NULL );
+	BOOL LoadFileTool ( const TCHAR *szFileName, LPDIRECT3DDEVICEQ pd3dDevice=NULL );//added by janzzs420
+	BOOL SaveFile ( const TCHAR *szFileName );
+
+	SANIMCONINFO& operator = ( SANIMCONINFO &value );
+};
+
+//Added by XMEN2 | 11-8-2012 | add new version for animation bin
+// ÇÑ ÇÁ·¹ÀÓ¿¡¼­ °¢°¢ÀÇ º»ÀÇ ¾Ö´Ï¸ÞÀÌ¼Ç Á¤º¸
+struct SAnimContainer : public SANIMCONINFO
+{
+public:
+	//enum { OLD_VERSION = 0x0102, };
+	//enum { VERSION = 0x0103, };
+	enum { VERSION = 0x0104, };
+	const static TCHAR szFILETYPE[];
+
+	typedef std::list<SAnimation*>		SANILIST;
+	typedef SANILIST::iterator			SANILIST_ITER;
+
+protected:
+	DWORD					m_dwRefCount;
+
+	bool					m_bLOAD;
+	bool					m_bVALID;
+	SANILIST				m_listAnimation;	// ÇÏÃ¼ °ü·Ã ¾Ö´Ï¸ÞÀÌ¼Ç °ª.
+	SANILIST				m_listAniUPBODY;	// »óÃ¼ °ü·Ã ¾Ö´Ï¸ÞÀÌ¼Ç °ª.	// Ver.101¿¡¼­ µé¾î°£ °ª.
+	//Added by XMEN2 | 11-8-2012 | add new version for animation bin
+	SANILIST				m_listAniDOWNBODY;	// »óÃ¼ °ü·Ã ¾Ö´Ï¸ÞÀÌ¼Ç °ª.	// Ver.101¿¡¼­ µé¾î°£ °ª.
+
+public:
+	DxSkeleton*				m_pSkeleton;		// º» Æ÷ÀÎÅÍ.
+
+public:
+	DWORD AddRef()		{ return m_dwRefCount++; }
+	DWORD Release()		{ if (m_dwRefCount!=0) m_dwRefCount--; return m_dwRefCount; }
+
+protected:
+	HRESULT LoadAnimationSet ( LPDIRECTXFILEDATA pxofobjCur );
+	HRESULT LoadAnimation ( LPDIRECTXFILEDATA pxofobjCur );
+
+public:
+	HRESULT CreateAnimationData ( SANIMCONINFO &AnimInfo, LPDIRECT3DDEVICEQ pd3dDevice, bool bREPRESH=false );
+	BOOL	IsValidateANI();
+
+public:
+	HRESULT SaveToFile ();
+
+public:
+	//	±âº» Á¤º¸ ¼³Á¤.
+	HRESULT SetInfo ( SANIMCONINFO &sAnimInfo, LPDIRECT3DDEVICEQ pd3dDevice );
+
+	//	ÆÄÀÏ¿¡¼­ ÀÐ±â.
+	HRESULT LoadAnimFromFile ( const TSTRING &strFilePath );
+	void SetAnimFromList ( SANILIST &listANI, SANILIST &listANIUPBODY );
+
+	//	ÆÄÀÏ¿¡¼­ ÀÐ±â. ( ½º·¹µå¿ë. )
+	static HRESULT LoadAnimFromFile ( const TSTRING &strFilePath, const DxSkeleton* pSkeleton, SANILIST &listANI, SANILIST &listANIUPBODY );
+
+	HRESULT  Load_0100( CSerialFile &SFile );
+	HRESULT  Load_0101( CSerialFile &SFile );
+	//Added by XMEN2 | 11-8-2012 | add new version for animation bin
+	HRESULT	 Load_0102( CSerialFile &SFile );
+	HRESULT  Load_0103( CSerialFile &SFile );
+	HRESULT  Load( CSerialFile &SFile );
+
+	//	¾²·¹µå¿ë 
+	static HRESULT  Load_0100( CSerialFile &SFile, const DxSkeleton* pSkeleton, SANILIST &listANI, SANILIST &listANIUPBODY );
+	static HRESULT  Load_0101( CSerialFile &SFile, const DxSkeleton* pSkeleton, SANILIST &listANI, SANILIST &listANIUPBODY );
+	//Added by XMEN2 | 11-8-2012 | add new version for animation bin
+	static HRESULT  Load_0102( CSerialFile &SFile, const DxSkeleton* pSkeleton, SANILIST &listANI, SANILIST &listANIUPBODY );
+	static HRESULT  Load_0103( CSerialFile &SFile, const DxSkeleton* pSkeleton, SANILIST &listANI, SANILIST &listANIUPBODY );
+	static HRESULT  Load( CSerialFile &SFile, const DxSkeleton* pSkeleton, SANILIST &listANI, SANILIST &listANIUPBODY );
+
+public:
+	bool UpdateTime ( float fCurTime, float fWeight=1.f, BOOL bFirst=TRUE, EMBODY emBody=EMBODY_DEFAULT );
+	bool UpdateMix ( float fCurMixTime );
+	void UpdateBoneScale( float fWeight, BOOL bFirst, float fTime );
+
+public:
+	SAnimContainer();
+	virtual ~SAnimContainer();
+};
+typedef SAnimContainer* PSANIMCONTAINER;
